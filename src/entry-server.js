@@ -1,3 +1,5 @@
+import jsesc from 'jsesc';
+
 // Server side data loading approach based on:
 // https://ssr.vuejs.org/en/data.html#client-data-fetching
 
@@ -64,15 +66,15 @@ export default function initializeServer(createApp, serverOpts) {
                         // Stringify so we can use JSON.parse for performance.
                         //   Double stringify to properly escape characters. See:
                         //   https://v8.dev/blog/cost-of-javascript-2019#json
-                        initialState: JSON.stringify(JSON.stringify(
-                            store.state,
-                            // Convert all undefined values to null's during stringification.
-                            // Default behavior of JSON.stringify is to strip undefined values,
-                            // which breaks client side hydration because Vue won't make the
-                            // property reactive. See:
-                            //   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#Description
-                            (k, v) => (v === undefined ? null : v),
-                        )),
+                        //   using jsesc for second stringify to help protect against XSS attacks
+                        //   https://gist.github.com/mathiasbynens/d6e10171d44a59bb5664617c64ff2763#file-escape-js-L15
+                        //   https://github.com/mathiasbynens/jsesc#isscriptcontext
+                        initialState: jsesc(JSON.stringify(store.state,
+                            (k, v) => (v === undefined ? null : v)), {
+                            quotes: 'double',
+                            json: true,
+                            isScriptContext: true,
+                        }),
                     }))
                     .then(() => resolve(app))
                     .catch((e) => {
